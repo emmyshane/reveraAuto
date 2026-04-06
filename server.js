@@ -1,23 +1,44 @@
 /**
- * Clean URL Development Server
+ * Revera Auto - Production Server
  * 
- * This Express.js server provides clean URL routing for local development.
- * It removes .html extensions from URLs and handles 301 redirects.
+ * Express.js server with clean URL routing, gzip compression,
+ * security headers, and static asset caching.
  * 
  * Usage:
- *   npm install express
- *   node server.js
+ *   npm start          (production)
+ *   npm run dev         (development)
  * 
  * Then visit: http://localhost:3000
  */
 
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
+const isProd = process.env.NODE_ENV === 'production';
+
+// ============================================================
+// Middleware: Gzip Compression (reduces response size ~70%)
+// ============================================================
+app.use(compression());
+
+// ============================================================
+// Middleware: Security Headers
+// ============================================================
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (isProd) {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+});
 
 // ============================================================
 // Middleware: Redirect .html URLs to clean URLs (301)
@@ -84,11 +105,14 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
-// Serve static files (CSS, JS, images, etc.)
+// Serve static files with caching (CSS, JS, images, etc.)
 // ============================================================
 app.use(express.static(ROOT_DIR, {
     extensions: ['html'], // Try .html extension for extensionless requests
-    index: 'index.html'
+    index: 'index.html',
+    maxAge: isProd ? '30d' : 0, // Cache static assets for 30 days in production
+    etag: true,
+    lastModified: true
 }));
 
 // ============================================================
@@ -107,11 +131,18 @@ app.use((req, res) => {
 // Start Server
 // ============================================================
 app.listen(PORT, () => {
-    console.log(`\n🚀 One-Auto Salvage Development Server`);
+    console.log(`\n🚀 Revera Auto Server`);
+    console.log(`   Mode: ${isProd ? 'PRODUCTION' : 'DEVELOPMENT'}`);
     console.log(`   Running at: http://localhost:${PORT}`);
     console.log(`\n📋 Clean URL Routing Active:`);
     console.log(`   /about-us.html  →  301 →  /about-us`);
     console.log(`   /contact-us.html  →  301 →  /contact-us`);
     console.log(`   /index.html  →  301 →  /`);
+    if (isProd) {
+        console.log(`\n🔒 Production optimizations enabled:`);
+        console.log(`   ✓ Gzip compression`);
+        console.log(`   ✓ Security headers`);
+        console.log(`   ✓ Static asset caching (30 days)`);
+    }
     console.log(`\n   Press Ctrl+C to stop\n`);
 });
